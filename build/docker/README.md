@@ -81,7 +81,7 @@ This process will fetch & begin running the software in each container. It addit
 
 Running this will interactively follow the logs of each container.
 
-```docker-compose -f build/docker/docker-compose.yml --env-file build/docker/resources/env.sh config```
+```docker-compose -f build/docker/docker-compose.yml --env-file build/docker/resources/env.sh up```
 
 #### Run the Compose File Daemonized
 
