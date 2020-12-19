@@ -54,15 +54,16 @@ class Service(AbstractBase):
     __mapper_args__ = {"polymorphic_identity": "service", "polymorphic_on": type}
     id = db.Column(Integer, primary_key=True)
     name = db.Column(db.SmallString, unique=True)
-    public = db.Column(Boolean)
+    public = db.Column(Boolean, default=False)
     shared = db.Column(Boolean, default=False)
     scoped_name = db.Column(db.SmallString, index=True)
-    last_modified = db.Column(db.SmallString, info={"log_change": False})
+    last_modified = db.Column(db.TinyString, info={"log_change": False})
     description = db.Column(db.SmallString)
     number_of_retries = db.Column(Integer, default=0)
     time_between_retries = db.Column(Integer, default=10)
     max_number_of_retries = db.Column(Integer, default=100)
     positions = db.Column(db.Dict, info={"log_change": False})
+    disable_result_creation = db.Column(Boolean, default=False)
     tasks = relationship("Task", back_populates="service", cascade="all,delete")
     events = relationship("Event", back_populates="service", cascade="all,delete")
     vendor = db.Column(db.SmallString)
@@ -92,7 +93,7 @@ class Service(AbstractBase):
     )
     update_pools = db.Column(Boolean, default=False)
     send_notification = db.Column(Boolean, default=False)
-    send_notification_method = db.Column(db.SmallString, default="mail")
+    send_notification_method = db.Column(db.TinyString, default="mail")
     notification_header = db.Column(db.LargeString)
     display_only_failed_nodes = db.Column(Boolean, default=True)
     include_device_results = db.Column(Boolean, default=True)
@@ -106,10 +107,10 @@ class Service(AbstractBase):
     iteration_values = db.Column(db.LargeString)
     iteration_variable_name = db.Column(db.SmallString, default="iteration_value")
     iteration_devices = db.Column(db.LargeString)
-    iteration_devices_property = db.Column(db.SmallString, default="ip_address")
+    iteration_devices_property = db.Column(db.TinyString, default="ip_address")
     preprocessing = db.Column(db.LargeString)
     postprocessing = db.Column(db.LargeString)
-    postprocessing_mode = db.Column(db.SmallString, default="always")
+    postprocessing_mode = db.Column(db.TinyString, default="always")
     log_level = db.Column(Integer, default=1)
     runs = relationship(
         "Run",
@@ -126,16 +127,16 @@ class Service(AbstractBase):
     maximum_runs = db.Column(Integer, default=1)
     multiprocessing = db.Column(Boolean, default=False)
     max_processes = db.Column(Integer, default=5)
-    status = db.Column(db.SmallString, default="Idle")
-    validation_condition = db.Column(db.SmallString, default="success")
-    conversion_method = db.Column(db.SmallString, default="none")
-    validation_method = db.Column(db.SmallString, default="none")
+    status = db.Column(db.TinyString, default="Idle")
+    validation_condition = db.Column(db.TinyString, default="success")
+    conversion_method = db.Column(db.TinyString, default="none")
+    validation_method = db.Column(db.TinyString, default="none")
     content_match = db.Column(db.LargeString)
     content_match_regex = db.Column(Boolean, default=False)
     dict_match = db.Column(db.Dict)
     negative_logic = db.Column(Boolean, default=False)
     delete_spaces_before_matching = db.Column(Boolean, default=False)
-    run_method = db.Column(db.SmallString, default="per_device")
+    run_method = db.Column(db.TinyString, default="per_device")
 
     def __init__(self, **kwargs):
         kwargs.pop("status", None)
@@ -251,12 +252,12 @@ class Result(AbstractBase):
     log_change = False
     id = db.Column(Integer, primary_key=True)
     success = db.Column(Boolean, default=False)
-    runtime = db.Column(db.SmallString)
-    duration = db.Column(db.SmallString)
+    runtime = db.Column(db.TinyString)
+    duration = db.Column(db.TinyString)
     result = db.Column(db.Dict)
     run_id = db.Column(Integer, ForeignKey("run.id", ondelete="cascade"))
     run = relationship("Run", back_populates="results", foreign_keys="Result.run_id")
-    parent_runtime = db.Column(db.SmallString)
+    parent_runtime = db.Column(db.TinyString)
     parent_device_id = db.Column(Integer, ForeignKey("device.id"))
     parent_device = relationship("Device", uselist=False, foreign_keys=parent_device_id)
     parent_device_name = association_proxy("parent_device", "name")
@@ -311,7 +312,7 @@ class ServiceLog(AbstractBase):
     log_change = False
     id = db.Column(Integer, primary_key=True)
     content = db.Column(db.LargeString)
-    runtime = db.Column(db.SmallString)
+    runtime = db.Column(db.TinyString)
     service_id = db.Column(Integer, ForeignKey("service.id"))
     service = relationship("Service", foreign_keys="ServiceLog.service_id")
 
@@ -336,17 +337,17 @@ class Run(AbstractBase):
     creator = db.Column(db.SmallString, default="")
     properties = db.Column(db.Dict)
     success = db.Column(Boolean, default=False)
-    status = db.Column(db.SmallString, default="Running")
-    runtime = db.Column(db.SmallString, index=True)
-    duration = db.Column(db.SmallString)
-    trigger = db.Column(db.SmallString, default="UI")
+    status = db.Column(db.TinyString, default="Running")
+    runtime = db.Column(db.TinyString, index=True)
+    duration = db.Column(db.TinyString)
+    trigger = db.Column(db.TinyString, default="UI")
     parent_id = db.Column(Integer, ForeignKey("run.id", ondelete="cascade"))
     parent = relationship(
         "Run", remote_side=[id], foreign_keys="Run.parent_id", back_populates="children"
     )
     children = relationship("Run", foreign_keys="Run.parent_id")
-    parent_runtime = db.Column(db.SmallString)
-    path = db.Column(db.SmallString)
+    parent_runtime = db.Column(db.TinyString)
+    path = db.Column(db.TinyString)
     parent_device_id = db.Column(Integer, ForeignKey("device.id"))
     parent_device = relationship("Device", foreign_keys="Run.parent_device_id")
     devices = relationship(
@@ -386,6 +387,8 @@ class Run(AbstractBase):
         if not kwargs.get("parent_runtime"):
             self.parent_runtime = self.runtime
             self.path = str(self.service.id)
+        elif self.parent_device:
+            self.path = self.parent.path
         else:
             self.path = f"{self.parent.path}>{self.service.id}"
         if not self.start_services:
@@ -473,7 +476,7 @@ class Run(AbstractBase):
     @property
     def stop(self):
         if app.redis_queue:
-            return bool(app.redis("get", f"stop/{self.runtime}"))
+            return bool(app.redis("get", f"stop/{self.parent_runtime}"))
         else:
             return app.run_stop[self.parent_runtime]
 
@@ -569,11 +572,6 @@ class Run(AbstractBase):
         finally:
             db.session.commit()
             state = self.get_state()
-            if "summary" not in results:
-                results["summary"] = {"failure": [], "success": []}
-                for result in self.results:
-                    key = "success" if result.result["success"] else "failure"
-                    results["summary"][key].append(result.device.name)
             self.status = state["status"] = "Aborted" if self.stop else "Completed"
             self.success = results["success"]
             if self.send_notification:
@@ -665,13 +663,14 @@ class Run(AbstractBase):
                 return {"result": result, "success": False}
         if self.run_method != "once":
             self.write_state("progress/device/total", len(self.devices), "increment")
+        summary = {"failure": [], "success": []}
         if self.iteration_devices and not self.parent_device:
             if not self.workflow:
                 result = "Device iteration not allowed outside of a workflow"
                 return {"success": False, "result": result, "runtime": self.runtime}
-            summary = {"failure": [], "success": []}
             for device in self.devices:
                 key = "success" if self.device_iteration(payload, device) else "failure"
+                self.write_state(f"progress/device/{key}", 1, "increment")
                 summary[key].append(device.name)
             return {
                 "success": not summary["failure"],
@@ -702,7 +701,11 @@ class Run(AbstractBase):
                     self.get_results(payload, device, commit=False)
                     for device in self.devices
                 ]
+            for result in results:
+                key = "success" if result["success"] else "failure"
+                summary[key].append(result["device_target"])
             return {
+                "summary": summary,
                 "success": all(result["success"] for result in results),
                 "runtime": self.runtime,
             }
@@ -735,7 +738,9 @@ class Run(AbstractBase):
                 results["devices"] = {}
                 for result in self.results:
                     results["devices"][result.device.name] = result.result
-        db.factory("result", result=results, commit=commit, **result_kw)
+        create_failed_results = self.disable_result_creation and not self.success
+        if not self.disable_result_creation or create_failed_results:
+            db.factory("result", result=results, commit=commit, **result_kw)
         return results
 
     def run_service_job(self, payload, device):
@@ -812,21 +817,23 @@ class Run(AbstractBase):
         self.log("info", "STARTING", device)
         start = datetime.now().replace(microsecond=0)
         skip_service = False
+        results = {"device_target": getattr(device, "name", None)}
         if self.skip_query:
             skip_service = self.eval(self.skip_query, **locals())[0]
         if skip_service or self.skip:
+            results.update(
+                {
+                    "result": "skipped",
+                    "duration": "0:00:00",
+                    "success": self.skip_value == "True",
+                }
+            )
             if device:
                 self.write_state("progress/device/skipped", 1, "increment")
-            results = {
-                "result": "skipped",
-                "duration": "0:00:00",
-                "success": self.skip_value == "True",
-            }
             self.create_result(
                 {"runtime": app.get_time(), **results}, device, commit=commit
             )
             return results
-        results = {}
         try:
             if self.restart_run and self.service.type == "workflow":
                 old_result = self.restart_run.result(
@@ -884,7 +891,10 @@ class Run(AbstractBase):
         logger=None,
         service_log=True,
     ):
-        log_level = int(self.original.service.log_level)
+        try:
+            log_level = int(self.original.service.log_level)
+        except Exception:
+            log_level = 1
         if not log_level or severity not in app.log_levels[log_level - 1 :]:
             return
         if device:
@@ -913,10 +923,11 @@ class Run(AbstractBase):
         if self.include_link_in_summary:
             address = app.settings["app"]["address"]
             notification["Link"] = f"{address}/view_service_results/{self.id}"
-        if results["summary"]["failure"]:
-            notification["FAILED"] = results["summary"]["failure"]
-        if results["summary"]["success"] and not self.display_only_failed_nodes:
-            notification["PASSED"] = results["summary"]["success"]
+        if "summary" in results:
+            if results["summary"]["failure"]:
+                notification["FAILED"] = results["summary"]["failure"]
+            if results["summary"]["success"] and not self.display_only_failed_nodes:
+                notification["PASSED"] = results["summary"]["success"]
         return notification
 
     def notify(self, results):
@@ -994,7 +1005,7 @@ class Run(AbstractBase):
             elif self.conversion_method == "json":
                 result["result"] = loads(result["result"])
             elif self.conversion_method == "xml":
-                result["result"] = parse(result["result"])
+                result["result"] = parse(result["result"], force_list=True)
         except (ExpatError, JSONDecodeError) as exc:
             result = {
                 "success": False,
@@ -1117,6 +1128,11 @@ class Run(AbstractBase):
             raise ImportError(f"Module '{module}' is restricted.")
         return importlib_import(module, *args, **kwargs)
 
+    def fetch(self, model, func="fetch", **kwargs):
+        if model not in ("device", "link", "pool", "service"):
+            raise db.rbac_error(f"Cannot fetch {model}s from workflow builder.")
+        return getattr(db, func)(model, rbac="edit", username=self.creator, **kwargs)
+
     def global_variables(_self, **locals):  # noqa: N805
         payload, device = locals.get("payload", {}), locals.get("device")
         variables = locals
@@ -1126,9 +1142,12 @@ class Run(AbstractBase):
         variables.update(
             {
                 "__builtins__": {**builtins, "__import__": _self._import},
+                "fetch": _self.fetch,
+                "fetch_all": partial(_self.fetch, func="fetch_all"),
                 "send_email": app.send_email,
                 "settings": app.settings,
                 "devices": _self.devices,
+                "encrypt": app.encrypt_password,
                 "get_var": partial(_self.get_var, payload),
                 "get_result": _self.get_result,
                 "log": _self.log,
@@ -1191,7 +1210,10 @@ class Run(AbstractBase):
             self.log("info", "Using cached Netmiko connection", device)
             return self.update_netmiko_connection(connection)
         self.log(
-            "info", "OPENING Netmiko connection", device, logger="security",
+            "info",
+            "OPENING Netmiko connection",
+            device,
+            logger="security",
         )
         username, password = self.get_credentials(device)
         driver = device.netmiko_driver if self.use_device_driver else self.driver
@@ -1224,7 +1246,10 @@ class Run(AbstractBase):
             self.log("info", "Using cached Scrapli connection", device)
             return connection
         self.log(
-            "info", "OPENING Scrapli connection", device, logger="security",
+            "info",
+            "OPENING Scrapli connection",
+            device,
+            logger="security",
         )
         username, password = self.get_credentials(device)
         connection = Scrapli(
@@ -1246,7 +1271,10 @@ class Run(AbstractBase):
             self.log("info", "Using cached NAPALM connection", device)
             return connection
         self.log(
-            "info", "OPENING Napalm connection", device, logger="security",
+            "info",
+            "OPENING Napalm connection",
+            device,
+            logger="security",
         )
         username, password = self.get_credentials(device)
         optional_args = self.service.optional_args

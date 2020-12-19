@@ -414,7 +414,9 @@ class AutomationController(BaseController):
             if kwargs.get(key)
         }
         restart_run = db.fetch(
-            "run", allow_none=True, runtime=kwargs.get("restart_runtime"),
+            "run",
+            allow_none=True,
+            runtime=kwargs.get("restart_runtime"),
         )
         if restart_run:
             run_kwargs["restart_run"] = restart_run
@@ -506,7 +508,7 @@ class AutomationController(BaseController):
         run = db.fetch("run", allow_none=True, runtime=runtime)
         if run and run.status == "Running":
             if self.redis_queue:
-                self.redis("set", f"stop/{runtime}", "true")
+                self.redis("set", f"stop/{run.parent_runtime}", "true")
             else:
                 self.run_stop[run.parent_runtime] = True
             return True

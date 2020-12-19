@@ -58,6 +58,7 @@ class BaseController:
     property_names = {}
 
     def __init__(self):
+        self.pre_init()
         self.settings = settings
         self.rbac = rbac
         self.properties = properties
@@ -78,6 +79,7 @@ class BaseController:
         self.init_redis()
         self.init_scheduler()
         self.init_connection_pools()
+        self.post_init()
 
     def init_encryption(self):
         self.fernet_encryption = environ.get("FERNET_KEY")
@@ -86,6 +88,11 @@ class BaseController:
             self.encrypt, self.decrypt = fernet.encrypt, fernet.decrypt
         else:
             self.encrypt, self.decrypt = b64encode, b64decode
+
+    def encrypt_password(self, password):
+        if isinstance(password, str):
+            password = str.encode(password)
+        return self.encrypt(password)
 
     def get_password(self, password):
         if not password:
@@ -116,6 +123,7 @@ class BaseController:
     def reset_run_status(self):
         for run in db.fetch("run", all_matches=True, allow_none=True, status="Running"):
             run.status = "Aborted (RELOAD)"
+            run.service.status = "Idle"
         db.session.commit()
 
     def fetch_version(self):
@@ -503,11 +511,13 @@ class BaseController:
     def update_database_configurations_from_git(self):
         for dir in scandir(self.path / "network_data"):
             device = db.fetch("device", allow_none=True, name=dir.name)
+            filepath = Path(dir.path) / "data.yml"
             if not device:
                 continue
-            with open(Path(dir.path) / "data.yml") as data:
-                parameters = yaml.load(data)
-                device.update(**{"dont_update_pools": True, **parameters})
+            if filepath.exists():
+                with open(Path(dir.path) / "data.yml") as data:
+                    parameters = yaml.load(data)
+                    device.update(**{"dont_update_pools": True, **parameters})
             for data in self.configuration_properties:
                 filepath = Path(dir.path) / data
                 if not filepath.exists():

@@ -96,12 +96,14 @@ class Database:
         else:
             self.LargeString = Text(settings["database"]["large_string_length"])
         self.SmallString = String(settings["database"]["small_string_length"])
+        self.TinyString = String(settings["database"]["tiny_string_length"])
 
         default_ctypes = {
             self.Dict: {},
             self.List: [],
             self.LargeString: "",
             self.SmallString: "",
+            self.TinyString: "",
             Text: "",
         }
 
@@ -238,8 +240,16 @@ class Database:
             Column("child_id", Integer, ForeignKey("service.id"), primary_key=True),
         )
 
-    def fetch(self, model, allow_none=False, all_matches=False, rbac="read", **kwargs):
-        query = self.query(model, rbac).filter_by(**kwargs)
+    def fetch(
+        self,
+        model,
+        allow_none=False,
+        all_matches=False,
+        rbac="read",
+        username=None,
+        **kwargs,
+    ):
+        query = self.query(model, rbac, username=username).filter_by(**kwargs)
         for index in range(self.retry_fetch_number):
             try:
                 result = query.all() if all_matches else query.first()

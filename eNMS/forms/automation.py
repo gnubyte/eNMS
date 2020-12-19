@@ -32,6 +32,7 @@ class ServiceForm(BaseForm):
         "Query Property Type", choices=(("name", "Name"), ("ip_address", "IP address"))
     )
     devices = MultipleInstanceField("Devices")
+    disable_result_creation = BooleanField("Save only failed results")
     pools = MultipleInstanceField("Pools")
     update_pools = BooleanField("Update pools before running")
     workflows = MultipleInstanceField("Workflows")
@@ -58,7 +59,8 @@ class ServiceForm(BaseForm):
         "Skip Query (Python)", python=True, widget=TextArea(), render_kw={"rows": 2}
     )
     skip_value = SelectField(
-        "Skip Value", choices=(("True", "True"), ("False", "False")),
+        "Skip Value",
+        choices=(("True", "True"), ("False", "False")),
     )
     vendor = StringField("Vendor")
     operating_system = StringField("Operating System")
@@ -176,7 +178,9 @@ class ConnectionForm(ServiceForm):
     )
     custom_username = StringField("Custom Username", substitution=True)
     custom_password = PasswordField("Custom Password", substitution=True)
-    use_host_keys = BooleanField("Use Host Keys")
+    use_host_keys = BooleanField(
+        "Use Host Keys - Requires: 'Custom Credentials' with 'Custom Username'"
+    )
     start_new_connection = BooleanField("Start New Connection")
     close_connection = BooleanField("Close Connection")
     groups = {

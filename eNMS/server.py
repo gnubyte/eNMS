@@ -58,28 +58,6 @@ class Server(Flask):
         self.configure_rest_api()
 
     @staticmethod
-    def monitor_rest_request(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            for index in range(db.retry_commit_number):
-                try:
-                    result = func(*args, **kwargs)
-                except Exception as exc:
-                    return rest_abort(500, message=str(exc))
-                try:
-                    db.session.commit()
-                    return result
-                except Exception as exc:
-                    db.session.rollback()
-                    app.log("error", f"Rest Call n°{index} failed ({exc}).")
-                    stacktrace = format_exc()
-                    sleep(db.retry_commit_time * (index + 1))
-            else:
-                rest_abort(500, message=stacktrace)
-
-        return wrapper
-
-    @staticmethod
     def monitor_requests(function):
         @wraps(function)
         def decorated_function(*args, **kwargs):
@@ -201,7 +179,7 @@ class Server(Flask):
             if user:
                 request_type = f"{request.method.lower()}_requests"
                 endpoint = "/".join(request.path.split("/")[:3])
-                authorized_endpoint = endpoint in getattr(user, request_type)
+                authorized_endpoint = endpoint in getattr(user, request_type, [])
                 if user.is_admin or authorized_endpoint:
                     login_user(user)
                     return True
@@ -358,6 +336,30 @@ class Server(Flask):
 
         self.register_blueprint(blueprint)
 
+    @staticmethod
+    def monitor_rest_request(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for index in range(db.retry_commit_number):
+                try:
+                    result = func(*args, **kwargs)
+                except db.rbac_error as exc:
+                    return rest_abort(404, message=str(exc))
+                except Exception as exc:
+                    return rest_abort(500, message=str(exc))
+                try:
+                    db.session.commit()
+                    return result
+                except Exception as exc:
+                    db.session.rollback()
+                    app.log("error", f"Rest Call n°{index} failed ({exc}).")
+                    stacktrace = format_exc()
+                    sleep(db.retry_commit_time * (index + 1))
+            else:
+                rest_abort(500, message=stacktrace)
+
+        return wrapper
+
     def configure_rest_api(self):
 
         api = Api(self, decorators=[self.csrf.exempt])
@@ -395,7 +397,8 @@ class Server(Flask):
             decorators = [self.auth.login_required, self.monitor_rest_request]
 
             def get(self, model):
-                results = db.fetch(model, all_matches=True, **request.args.to_dict())
+                properties = request.args.to_dict()
+                results = db.fetch(model, all_matches=True, **properties)
                 return [
                     result.get_properties(exclude=["positions"]) for result in results
                 ]
@@ -426,10 +429,11 @@ class Server(Flask):
                     "run", service_name=name, runtime=runtime, allow_none=True
                 )
                 if not run:
-                    return (
+                    error_message = (
                         "There are no results or on-going services "
                         "for the requested service and runtime."
                     )
+                    return {"error": error_message}
                 else:
                     result = run.result()
                     return {
