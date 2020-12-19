@@ -58,3 +58,5 @@ build/docker/db
 build/docker/logs
 build/docker/network_data
 build/docker/vault
+build/docker/nginx
+build/docker/certs
