@@ -21,6 +21,7 @@ These deployment strategies are a good double for setting up a testing environme
     - [Install Docker Compose](#install-docker-compose)
     - [Run the Compose File](#run-the-compose-file)
       - [Run the Compose File Daemonized](#run-the-compose-file-daemonized)
+      - [Run the Compose File, with NGINX Proxy, Daemonized](#run-the-compose-file-with-nginx-proxy-daemonized)
       - [Tail the Compose Services Logs](#tail-the-compose-services-logs)
     - [Edit the configuration](#edit-the-configuration)
     - [Inspect the configuration](#inspect-the-configuration)
@@ -86,7 +87,17 @@ Running this will interactively follow the logs of each container.
 
 This will run the containers in the background instead of interactively in the foreground.
 
-```docker-compose  -d -f build/docker/docker-compose.yml --env-file build/docker/resources/env.sh config```
+```docker-compose -f build/docker/docker-compose.yml --env-file build/docker/resources/env.sh up -d```
+
+#### Run the Compose File, with NGINX Proxy, Daemonized
+
+**This is not hands off - you will need to modify values in the nginx config file**
+
+This will run the containers in the background instead of interactively in the foreground.
+
+**Edit the NGINX configuration file here**
+
+```docker-compose -f build/docker/docker-compose-nginx.yml --env-file build/docker/resources/env.sh up -d```
 
 #### Tail the Compose Services Logs
 
